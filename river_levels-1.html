@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>River Levels — Perthshire</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --slate: #0d1e26;
+    --slate-mid: #1c3442;
+    --slate-card: #162c3a;
+    --chalk: #f0f4f6;
+    --accent: #e8b84b;
+    --fish-red: #e84b4b;
+    --river-braan: #1a6b8a;
+    --river-braan-lt: #2a8db5;
+    --river-almond: #1a6b4b;
+    --river-almond-lt: #2ab57a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--slate);
+    color: var(--chalk);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 16px 48px;
+  }
+
+  /* ── TOP HEADER ── */
+  header {
+    width: 100%;
+    max-width: 820px;
+    padding: 28px 0 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  header h1 {
+    font-size: clamp(1.1rem,3.5vw,1.6rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  header h1 span { color: var(--accent); }
+  .sepa-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.58rem;
+    color: rgba(255,255,255,0.3);
+    text-align: right;
+    line-height: 1.7;
+  }
+
+  /* ── RIVER SELECTOR TABS ── */
+  .river-selector {
+    width: 100%;
+    max-width: 820px;
+    display: flex;
+    gap: 8px;
+    margin-top: 20px;
+  }
+  .river-tab {
+    flex: 1;
+    border: none;
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: clamp(0.8rem, 2vw, 0.95rem);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    line-height: 1.3;
+    position: relative;
+    overflow: hidden;
+  }
+  .river-tab .rt-river { font-size: 0.65rem; font-family: 'Space Mono', monospace; opacity: 0.65; letter-spacing: 0.08em; display: block; margin-bottom: 2px; }
+  .river-tab .rt-name  { display: block; }
+  .river-tab .rt-level { font-family: 'Space Mono', monospace; font-size: 0.75rem; margin-top: 4px; display: block; }
+  .river-tab.inactive {
+    background: var(--slate-mid);
+    color: rgba(255,255,255,0.45);
+    border: 1px solid rgba(255,255,255,0.07);
+  }
+  .river-tab.inactive:hover { border-color: rgba(255,255,255,0.2); color: rgba(255,255,255,0.7); }
+  .river-tab.active-braan  { background: var(--river-braan); color: #fff; }
+  .river-tab.active-almond { background: var(--river-almond); color: #fff; }
+  .fish-ok  { color: #7effc0; }
+  .fish-low { color: #ff9090; }
+
+  /* ── MAIN DASHBOARD ── */
+  .dashboard {
+    width: 100%;
+    max-width: 820px;
+    margin-top: 16px;
+    display: grid;
+    gap: 14px;
+  }
+
+  /* ── CONTROLS ROW ── */
+  .controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .last-updated { font-family: 'Space Mono', monospace; font-size: 0.62rem; color: rgba(255,255,255,0.35); }
+  .last-updated span { color: rgba(255,255,255,0.6); }
+  .refresh-btn {
+    background: var(--accent);
+    color: var(--slate);
+    border: none;
+    border-radius: 8px;
+    padding: 9px 20px;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .refresh-btn:hover { opacity: 0.88; }
+  .refresh-btn:active { transform: scale(0.97); }
+  .refresh-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .spinner { width:13px;height:13px;border:2px solid rgba(0,0,0,0.25);border-top-color:var(--slate);border-radius:50%;animation:spin .7s linear infinite;display:none; }
+  .refresh-btn.loading .spinner { display:block; }
+  .refresh-btn.loading .btn-icon { display:none; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* ── TOP ROW ── */
+  .top-row { display:grid; grid-template-columns: auto 1fr; gap:14px; align-items:stretch; }
+  .current-level-card {
+    border-radius: 12px;
+    padding: 22px 26px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 174px;
+    position: relative;
+    overflow: hidden;
+    transition: background 0.3s;
+  }
+  .current-level-card::after {
+    content: '≈';
+    position: absolute;
+    right: -10px; bottom: -28px;
+    font-size: 9rem;
+    opacity: 0.07;
+    font-family: Georgia, serif;
+    line-height: 1;
+  }
+  .current-level-card .label { font-family:'Space Mono',monospace;font-size:.62rem;letter-spacing:.12em;opacity:.75;text-transform:uppercase;margin-bottom:5px; }
+  .current-level-card .value { font-size:clamp(2.4rem,5.5vw,3.3rem);font-weight:800;line-height:1;letter-spacing:-0.03em; }
+  .current-level-card .unit  { font-family:'Space Mono',monospace;font-size:.8rem;opacity:.7;margin-top:3px; }
+
+  .fishing-status {
+    margin-top: 12px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    line-height: 1.4;
+  }
+  .fishing-status.fishable   { background: rgba(80,200,120,0.25); color: #7effc0; }
+  .fishing-status.unfishable { background: rgba(220,80,80,0.25);  color: #ff9090; }
+
+  .trend-state-row { display:flex; gap:7px; margin-top:8px; flex-wrap:wrap; }
+  .badge {
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+  }
+  .badge.rising   { background:rgba(220,80,80,0.4); }
+  .badge.falling  { background:rgba(80,180,120,0.35); }
+  .badge.steady   { background:rgba(255,255,255,0.13); }
+  .badge.normal   { background:rgba(80,200,120,0.28); color:#7effc0; }
+  .badge.high     { background:rgba(220,120,80,0.4);  color:#ffb07e; }
+  .badge.low      { background:rgba(180,160,80,0.32); color:#ffe07e; }
+
+  /* stats */
+  .stats-panel { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .stat-card { background:var(--slate-mid); border-radius:10px; padding:13px 15px; border:1px solid rgba(255,255,255,0.06); }
+  .stat-card .s-label { font-family:'Space Mono',monospace;font-size:.58rem;color:rgba(255,255,255,.4);letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px; }
+  .stat-card .s-value { font-size:1.2rem;font-weight:700;letter-spacing:-.02em; }
+  .stat-card .s-sub   { font-family:'Space Mono',monospace;font-size:.58rem;color:rgba(255,255,255,.3);margin-top:2px; }
+
+  /* ── GAUGE ── */
+  .gauge-card { background:var(--slate-mid); border-radius:12px; padding:18px 20px; border:1px solid rgba(255,255,255,.06); }
+  .gauge-track { height:22px; background:rgba(255,255,255,.06); border-radius:4px; position:relative; overflow:visible; margin-bottom:7px; }
+  .gauge-normal { position:absolute; top:0; bottom:0; background:rgba(42,141,181,.3); border-radius:4px; }
+  .gauge-fill   { position:absolute; top:0; bottom:0; left:0; border-radius:4px; transition:width .8s cubic-bezier(.4,0,.2,1); }
+  .gauge-marker { position:absolute; top:-5px; bottom:-5px; width:3px; border-radius:2px; transform:translateX(-50%); }
+  .gauge-fish-line {
+    position:absolute; top:-8px; bottom:-8px; width:2px;
+    background: var(--fish-red);
+    transform:translateX(-50%);
+    border-radius:2px;
+  }
+  .gauge-fish-label {
+    position:absolute;
+    top:-22px;
+    transform:translateX(-50%);
+    font-family:'Space Mono',monospace;
+    font-size:0.55rem;
+    color:var(--fish-red);
+    white-space:nowrap;
+    font-weight:700;
+  }
+  .gauge-labels { display:flex; justify-content:space-between; font-family:'Space Mono',monospace; font-size:.58rem; color:rgba(255,255,255,.28); margin-bottom:8px; }
+  .gauge-legend { display:flex; gap:14px; font-family:'Space Mono',monospace; font-size:.58rem; color:rgba(255,255,255,.38); flex-wrap:wrap; }
+  .gauge-legend span { display:flex; align-items:center; gap:5px; }
+  .dot { width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }
+
+  /* ── CHART ── */
+  .chart-card { background:var(--slate-mid); border-radius:12px; padding:18px 20px; border:1px solid rgba(255,255,255,.06); }
+  .chart-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px; }
+  .chart-header .c-title { font-family:'Space Mono',monospace; font-size:.62rem; letter-spacing:.1em; opacity:.45; text-transform:uppercase; }
+  .tabs { display:flex; background:rgba(0,0,0,.25); border-radius:8px; padding:3px; gap:2px; }
+  .tab-btn {
+    background:none; border:none;
+    color:rgba(255,255,255,.42);
+    font-family:'Space Mono',monospace; font-size:.68rem; font-weight:700;
+    padding:5px 13px; border-radius:6px; cursor:pointer;
+    transition:all .18s; letter-spacing:.05em;
+    position:relative; min-width:42px;
+  }
+  .tab-btn:hover { color:rgba(255,255,255,.72); }
+  .tab-btn.active { background:var(--accent); color:var(--slate); }
+  .tab-btn.tab-loading .tab-label { opacity:0; }
+  .tab-btn.tab-loading::after {
+    content:''; position:absolute; top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    width:9px; height:9px;
+    border:2px solid rgba(13,30,38,.25); border-top-color:var(--slate);
+    border-radius:50%; animation:spin .7s linear infinite;
+  }
+  .chart-wrap { position:relative; height:200px; }
+  canvas#chart { width:100%!important; height:200px!important; }
+  .chart-note { font-family:'Space Mono',monospace; font-size:.58rem; color:rgba(255,255,255,.23); margin-top:7px; text-align:right; min-height:1em; }
+
+  .error-msg { font-family:'Space Mono',monospace; font-size:.62rem; color:#ff8080; padding:7px 11px; background:rgba(255,80,80,.1); border-radius:8px; display:none; }
+
+  @media (max-width:520px) { .top-row { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Perthshire <span>River Levels</span></h1>
+  <div class="sepa-badge">SEPA Live Data<br>Tay Catchment</div>
+</header>
+
+<!-- RIVER SELECTOR -->
+<div class="river-selector">
+  <button class="river-tab active-braan" id="rtab-braan" onclick="switchRiver('braan')">
+    <span class="rt-river">RIVER</span>
+    <span class="rt-name">Braan at Hermitage</span>
+    <span class="rt-level" id="rtab-braan-level">Loading…</span>
+  </button>
+  <button class="river-tab inactive" id="rtab-almond" onclick="switchRiver('almond')">
+    <span class="rt-river">RIVER</span>
+    <span class="rt-name">Almond at Newton Bridge</span>
+    <span class="rt-level" id="rtab-almond-level">Loading…</span>
+  </button>
+</div>
+
+<div class="dashboard">
+
+  <div class="controls">
+    <div class="last-updated">Last fetched: <span id="fetchTime">—</span></div>
+    <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;">
+      <div class="error-msg" id="errorMsg"></div>
+      <button class="refresh-btn" id="refreshBtn" onclick="loadData(currentRiver, currentPeriod, true)">
+        <span class="btn-icon">↻</span><span class="spinner"></span>Refresh Live Data
+      </button>
+    </div>
+  </div>
+
+  <div class="top-row">
+    <div class="current-level-card" id="levelCard">
+      <div class="label">Current Level</div>
+      <div class="value" id="currentVal">—</div>
+      <div class="unit">metres</div>
+      <div class="fishing-status" id="fishingStatus">—</div>
+      <div class="trend-state-row">
+        <div class="badge" id="trendBadge">—</div>
+        <div class="badge normal" id="stateBadge">—</div>
+      </div>
+    </div>
+    <div class="stats-panel">
+      <div class="stat-card">
+        <div class="s-label" id="maxLabel">High</div>
+        <div class="s-value" id="maxVal">—</div>
+        <div class="s-sub"  id="maxTime">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="s-label" id="minLabel">Low</div>
+        <div class="s-value" id="minVal">—</div>
+        <div class="s-sub"  id="minTime">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="s-label" id="changeLabel">Change</div>
+        <div class="s-value" id="changeVal">—</div>
+        <div class="s-sub">first → latest</div>
+      </div>
+      <div class="stat-card">
+        <div class="s-label">Min. Fishing Level</div>
+        <div class="s-value" id="fishingLevelDisplay" style="color:var(--fish-red)">—</div>
+        <div class="s-sub" id="fishingLevelSub">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAUGE -->
+  <div class="gauge-card">
+    <div class="gauge-track" id="gaugeTrack">
+      <div class="gauge-normal" id="gaugeNormal"></div>
+      <div class="gauge-fill"   id="gaugeFill"></div>
+      <div class="gauge-marker" id="gaugeMarkerNL" style="background:#2a8db5;opacity:.65;"></div>
+      <div class="gauge-marker" id="gaugeMarkerNH" style="background:#2a8db5;opacity:.65;"></div>
+      <div class="gauge-fish-label" id="gaugeFishLabel">MIN FISHING</div>
+      <div class="gauge-fish-line"  id="gaugeFishLine"></div>
+    </div>
+    <div class="gauge-labels">
+      <span id="gaugeMin">—</span>
+      <span id="gaugeMax">—</span>
+    </div>
+    <div class="gauge-legend">
+      <span><span class="dot" style="background:#2a8db5;opacity:.7;"></span> Normal range</span>
+      <span><span class="dot" style="background:var(--accent);"></span> Current level</span>
+      <span><span class="dot" style="background:var(--fish-red);border-radius:2px;"></span> Min. fishing level</span>
+    </div>
+  </div>
+
+  <!-- CHART -->
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="c-title" id="chartTitle">Water Level</div>
+      <div class="tabs">
+        <button class="tab-btn active" id="tab-5D" onclick="switchTab('5D')"><span class="tab-label">5D</span></button>
+        <button class="tab-btn"        id="tab-1M" onclick="switchTab('1M')"><span class="tab-label">1M</span></button>
+        <button class="tab-btn"        id="tab-1Y" onclick="switchTab('1Y')"><span class="tab-label">1Y</span></button>
+      </div>
+    </div>
+    <div class="chart-wrap"><canvas id="chart"></canvas></div>
+    <div class="chart-note" id="chartNote"></div>
+  </div>
+
+</div>
+
+<script>
+// ── RIVER CONFIG ──────────────────────────────────────────────
+const RIVERS = {
+  braan: {
+    name:        'Braan at Hermitage',
+    river:       'River Braan',
+    tsId:        '61541010',
+    recordLow:   0.216,
+    recordHigh:  3.444,
+    normalLow:   0.302,
+    normalHigh:  1.806,
+    fishMin:     0.45,
+    color:       '#1a6b8a',
+    colorLt:     '#2a8db5',
+    activeClass: 'active-braan',
+  },
+  almond: {
+    name:        'Almond at Newton Bridge',
+    river:       'Almond (Tayside)',
+    tsId:        '55424010',
+    recordLow:   0.210,
+    recordHigh:  2.246,
+    normalLow:   0.255,
+    normalHigh:  1.690,
+    fishMin:     0.275,
+    color:       '#1a6b4b',
+    colorLt:     '#2ab57a',
+    activeClass: 'active-almond',
+  }
+};
+
+const BASE = 'https://timeseries.sepa.org.uk/KiWIS/KiWIS?service=kisters&type=queryServices&datasource=0&request=getTimeseriesValues&metadata=true&format=csv';
+const PERIODS = {
+  '5D': { param:'P5D',  label:'Last 5 Days',    statLabel:'5-Day',    changeLabel:'Change (5 days)',   note:'15-min intervals' },
+  '1M': { param:'P1M',  label:'Last 30 Days',   statLabel:'30-Day',   changeLabel:'Change (30 days)',  note:'15-min intervals' },
+  '1Y': { param:'P1Y',  label:'Last 12 Months', statLabel:'12-Month', changeLabel:'Change (1 year)',   note:'Daily readings (thinned)' },
+};
+
+let currentRiver  = 'braan';
+let currentPeriod = '5D';
+// cache[river][period] = data array
+const cache = { braan:{}, almond:{} };
+
+// ── HELPERS ──────────────────────────────────────────────────
+const toPercent = (v, rLow, rHigh) => Math.max(0, Math.min(100, (v - rLow) / (rHigh - rLow) * 100));
+
+function formatDate(iso, period) {
+  const d = new Date(iso);
+  if (period === '5D') return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'}) + ' ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  if (period === '1M') return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'});
+  return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+}
+
+function parseCSV(text) {
+  const data = []; let inData = false;
+  for (const line of text.split('\n')) {
+    if (line.startsWith('#Timestamp')) { inData = true; continue; }
+    if (!inData || !line.trim()) continue;
+    const [ts, raw] = line.split(';');
+    const val = parseFloat(raw);
+    if (ts && !isNaN(val)) data.push({ ts: ts.trim(), val });
+  }
+  return data;
+}
+
+function getTrend(data) {
+  if (data.length < 5) return 'Steady';
+  const last = data[data.length-1].val;
+  const prev = data.slice(-5,-1).reduce((a,b) => a+b.val, 0) / 4;
+  const d = last - prev;
+  return d > 0.002 ? 'Rising' : d < -0.002 ? 'Falling' : 'Steady';
+}
+
+function thinToDaily(data) {
+  const byDay = {};
+  for (const d of data) byDay[d.ts.slice(0,10)] = d;
+  return Object.values(byDay).sort((a,b) => a.ts < b.ts ? -1 : 1);
+}
+
+// ── UPDATE RIVER TAB BADGES ───────────────────────────────────
+function updateRiverTabBadge(river, val) {
+  const cfg = RIVERS[river];
+  const el = document.getElementById('rtab-' + river + '-level');
+  const fishable = val >= cfg.fishMin;
+  el.textContent = val.toFixed(3) + 'm — ' + (fishable ? '✓ Fishable' : '✗ Below min');
+  el.className = 'rt-level ' + (fishable ? 'fish-ok' : 'fish-low');
+}
+
+// ── GAUGE ─────────────────────────────────────────────────────
+function updateGauge(val, cfg) {
+  const pct   = toPercent(val,          cfg.recordLow, cfg.recordHigh);
+  const nlPct = toPercent(cfg.normalLow,  cfg.recordLow, cfg.recordHigh);
+  const nhPct = toPercent(cfg.normalHigh, cfg.recordLow, cfg.recordHigh);
+  const fPct  = toPercent(cfg.fishMin,    cfg.recordLow, cfg.recordHigh);
+
+  document.getElementById('gaugeFill').style.cssText =
+    `left:0;top:0;bottom:0;width:${pct}%;position:absolute;border-radius:4px;background:linear-gradient(90deg,${cfg.color},${cfg.colorLt});transition:width .8s cubic-bezier(.4,0,.2,1);`;
+  document.getElementById('gaugeNormal').style.cssText =
+    `left:${nlPct}%;width:${nhPct-nlPct}%;top:0;bottom:0;position:absolute;background:rgba(42,141,181,.28);border-radius:4px;`;
+  document.getElementById('gaugeMarkerNL').style.left = nlPct + '%';
+  document.getElementById('gaugeMarkerNH').style.left = nhPct + '%';
+  document.getElementById('gaugeFishLine').style.left  = fPct + '%';
+  document.getElementById('gaugeFishLabel').style.left = fPct + '%';
+  document.getElementById('gaugeMin').textContent = cfg.recordLow + 'm (record low)';
+  document.getElementById('gaugeMax').textContent = 'Record high: ' + cfg.recordHigh + 'm';
+}
+
+// ── STATS PANEL ───────────────────────────────────────────────
+function updateStats(data, river, period) {
+  const cfg = RIVERS[river];
+  const p   = PERIODS[period];
+  const latest = data[data.length-1].val;
+  const first  = data[0].val;
+  const maxD   = data.reduce((a,b) => b.val > a.val ? b : a);
+  const minD   = data.reduce((a,b) => b.val < a.val ? b : a);
+  const change = latest - first;
+  const trend  = getTrend(data);
+  const state  = latest < cfg.normalLow ? 'Low' : latest > cfg.normalHigh ? 'High' : 'Normal';
+  const fishable = latest >= cfg.fishMin;
+
+  // level card
+  document.getElementById('levelCard').style.background = cfg.color;
+  document.getElementById('currentVal').textContent = latest.toFixed(3);
+  document.getElementById('fetchTime').textContent  = new Date().toLocaleTimeString('en-GB');
+
+  const fs = document.getElementById('fishingStatus');
+  if (fishable) {
+    fs.className = 'fishing-status fishable';
+    fs.textContent = '🎣 Fishable — ' + (latest - cfg.fishMin).toFixed(3) + 'm above min';
+  } else {
+    fs.className = 'fishing-status unfishable';
+    fs.textContent = '✗ Below min — ' + (cfg.fishMin - latest).toFixed(3) + 'm short';
+  }
+
+  const tb = document.getElementById('trendBadge');
+  tb.className = 'badge ' + trend.toLowerCase();
+  tb.textContent = trend === 'Rising' ? '▲ Rising' : trend === 'Falling' ? '▼ Falling' : '— Steady';
+
+  const sb = document.getElementById('stateBadge');
+  sb.className = 'badge ' + state.toLowerCase();
+  sb.textContent = state;
+
+  document.getElementById('maxLabel').textContent = p.statLabel + ' High';
+  document.getElementById('minLabel').textContent = p.statLabel + ' Low';
+  document.getElementById('changeLabel').textContent = p.changeLabel;
+  document.getElementById('maxVal').textContent = maxD.val.toFixed(3) + 'm';
+  document.getElementById('maxTime').textContent = formatDate(maxD.ts, period);
+  document.getElementById('minVal').textContent = minD.val.toFixed(3) + 'm';
+  document.getElementById('minTime').textContent = formatDate(minD.ts, period);
+
+  const ce = document.getElementById('changeVal');
+  ce.textContent  = (change >= 0 ? '+' : '') + change.toFixed(3) + 'm';
+  ce.style.color  = change > 0 ? '#ff9090' : change < 0 ? '#7effc0' : 'inherit';
+
+  document.getElementById('fishingLevelDisplay').textContent = cfg.fishMin.toFixed(3) + 'm';
+  document.getElementById('fishingLevelSub').textContent     = cfg.name.split(' at ')[0];
+  document.getElementById('chartTitle').textContent = cfg.river + ' — ' + p.label;
+
+  updateGauge(latest, cfg);
+  updateRiverTabBadge(river, latest);
+}
+
+// ── CHART ─────────────────────────────────────────────────────
+function drawChart(rawData, river, period) {
+  const cfg  = RIVERS[river];
+  const data = period === '1Y' ? thinToDaily(rawData) : rawData;
+  const canvas = document.getElementById('chart');
+  const ctx    = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const W   = canvas.parentElement.getBoundingClientRect().width;
+  const H   = 200;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const vals = data.map(d => d.val);
+  // make sure fish line is visible even if data is all above it
+  const dataMin = Math.min(...vals, cfg.fishMin);
+  const dataMax = Math.max(...vals, cfg.fishMin);
+  const minV = dataMin - 0.005;
+  const maxV = dataMax + 0.005;
+
+  const pL=52, pR=12, pT=14, pB=28;
+  const cW = W-pL-pR, cH = H-pT-pB;
+  const xOf = i => pL + (i/(data.length-1))*cW;
+  const yOf = v => pT + (1-(v-minV)/(maxV-minV))*cH;
+  const fishY = yOf(cfg.fishMin);
+
+  // grid
+  ctx.lineWidth = 1;
+  for (let i=0;i<=4;i++) {
+    const y = pT + (i/4)*cH;
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.beginPath(); ctx.moveTo(pL,y); ctx.lineTo(W-pR,y); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.27)';
+    ctx.font = `10px 'Space Mono',monospace`;
+    ctx.textAlign = 'right';
+    ctx.fillText((maxV-(i/4)*(maxV-minV)).toFixed(3), pL-4, y+4);
+  }
+
+  // normal range band
+  const nyH = yOf(Math.min(cfg.normalHigh, maxV));
+  const nyL = yOf(Math.max(cfg.normalLow,  minV));
+  if (nyL > nyH) { ctx.fillStyle='rgba(42,141,181,0.08)'; ctx.fillRect(pL,nyH,cW,nyL-nyH); }
+
+  // fishing minimum line (dashed red)
+  if (fishY >= pT && fishY <= pT+cH) {
+    ctx.save();
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = '#e84b4b';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(pL, fishY); ctx.lineTo(W-pR, fishY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    // label
+    ctx.fillStyle = '#e84b4b';
+    ctx.font = `bold 9px 'Space Mono',monospace`;
+    ctx.textAlign = 'left';
+    ctx.fillText('MIN FISHING ' + cfg.fishMin + 'm', pL+3, fishY - 4);
+  }
+
+  // area gradient
+  const grad = ctx.createLinearGradient(0,pT,0,pT+cH);
+  grad.addColorStop(0, cfg.color + 'aa');
+  grad.addColorStop(1, cfg.color + '00');
+  ctx.beginPath();
+  ctx.moveTo(xOf(0), yOf(data[0].val));
+  for (let i=1;i<data.length;i++) ctx.lineTo(xOf(i), yOf(data[i].val));
+  ctx.lineTo(xOf(data.length-1), pT+cH);
+  ctx.lineTo(xOf(0), pT+cH);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // line
+  ctx.beginPath();
+  ctx.moveTo(xOf(0), yOf(data[0].val));
+  for (let i=1;i<data.length;i++) ctx.lineTo(xOf(i), yOf(data[i].val));
+  ctx.strokeStyle = cfg.colorLt;
+  ctx.lineWidth = period === '1Y' ? 1.5 : 2;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  // latest dot
+  ctx.beginPath();
+  ctx.arc(xOf(data.length-1), yOf(data[data.length-1].val), 4, 0, Math.PI*2);
+  ctx.fillStyle = '#e8b84b'; ctx.fill();
+
+  // x labels
+  ctx.fillStyle = 'rgba(255,255,255,0.28)';
+  ctx.font = `9px 'Space Mono',monospace`;
+  ctx.textAlign = 'center';
+  for (let i=0;i<=5;i++) {
+    const idx = Math.round((i/5)*(data.length-1));
+    const d   = new Date(data[idx].ts);
+    const lbl = period === '1Y'
+      ? d.toLocaleDateString('en-GB',{month:'short',year:'2-digit'})
+      : d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+    ctx.fillText(lbl, xOf(idx), H-8);
+  }
+
+  const rawCount = cache[river][period] ? cache[river][period].length : data.length;
+  document.getElementById('chartNote').textContent = period === '1Y'
+    ? `${rawCount.toLocaleString()} raw readings · thinned to ${data.length} daily points`
+    : `${data.length.toLocaleString()} readings · ${PERIODS[period].note}`;
+}
+
+// ── LOAD DATA ─────────────────────────────────────────────────
+async function loadData(river, period, forceRefresh) {
+  const cfg    = RIVERS[river];
+  const btn    = document.getElementById('refreshBtn');
+  const errEl  = document.getElementById('errorMsg');
+  const tabBtn = document.getElementById('tab-' + period);
+
+  if (cache[river][period] && !forceRefresh) {
+    updateStats(cache[river][period], river, period);
+    drawChart(cache[river][period], river, period);
+    return;
+  }
+
+  btn.disabled = true;
+  btn.classList.add('loading');
+  tabBtn.classList.add('tab-loading');
+  errEl.style.display = 'none';
+
+  try {
+    const url = BASE + '&ts_id=' + cfg.tsId + '&period=' + PERIODS[period].param;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    const data = parseCSV(text);
+    if (!data.length) throw new Error('No readings returned');
+
+    cache[river][period] = data;
+    updateStats(data, river, period);
+    drawChart(data, river, period);
+
+    // update river tab badge even if not active
+    updateRiverTabBadge(river, data[data.length-1].val);
+
+  } catch(e) {
+    errEl.textContent = `Could not load data: ${e.message}`;
+    errEl.style.display = 'block';
+    if (cache[river][period]) {
+      updateStats(cache[river][period], river, period);
+      drawChart(cache[river][period], river, period);
+    }
+  }
+
+  btn.disabled = false;
+  btn.classList.remove('loading');
+  tabBtn.classList.remove('tab-loading');
+}
+
+// ── SWITCH RIVER ──────────────────────────────────────────────
+function switchRiver(river) {
+  currentRiver = river;
+  // tab styles
+  Object.keys(RIVERS).forEach(r => {
+    const btn = document.getElementById('rtab-' + r);
+    if (r === river) {
+      btn.className = 'river-tab ' + RIVERS[r].activeClass;
+    } else {
+      btn.className = 'river-tab inactive';
+    }
+  });
+  loadData(river, currentPeriod, false);
+}
+
+// ── SWITCH TIME PERIOD ────────────────────────────────────────
+function switchTab(period) {
+  currentPeriod = period;
+  ['5D','1M','1Y'].forEach(p => {
+    document.getElementById('tab-'+p).classList.toggle('active', p===period);
+  });
+  loadData(currentRiver, period, false);
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+loadData('braan',  '5D', false);
+loadData('almond', '5D', false); // pre-fetch almond 5D for tab badge
+
+window.addEventListener('resize', () => {
+  if (cache[currentRiver][currentPeriod]) drawChart(cache[currentRiver][currentPeriod], currentRiver, currentPeriod);
+});
+</script>
+</body>
+</html>
